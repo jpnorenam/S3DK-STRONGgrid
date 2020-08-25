@@ -19,9 +19,17 @@
 *  along with StrongridDLL.  If not, see <http://www.gnu.org/licenses/>.
 *
 */
-
+#ifdef _WIN32
 #include <WinSock2.h>
 #include <ws2tcpip.h>
+#else
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <netdb.h>
+#include <errno.h>
+#include <string.h>
+#endif
 #include <sstream>
 #include "../StrongridBase/common.h"
 #include "TcpClient.h"
@@ -73,7 +81,11 @@ void TcpClient::Connect()
         }
 
         if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
+#ifdef _WIN32
             closesocket(sockfd);
+#else
+			close(sockfd);
+#endif
             perror("client: connect");
             continue;
         }
@@ -91,7 +103,11 @@ void TcpClient::Connect()
 
 void TcpClient::Close()
 {
+#ifdef _WIN32
 	if( m_sockfd != 0 ) closesocket(m_sockfd);
+#else
+	if (m_sockfd != 0) close(m_sockfd);
+#endif
 	m_sockfd = 0;
 }
 
@@ -115,17 +131,32 @@ int TcpClient::Send( const char* data, int length )
 int TcpClient::Recv( char* refData, int length, int timeoutMs )
 {
 	int bytesReceived = 0;
+#ifndef _WIN32
+	struct timeval timeout;
+	timeout.tv_sec = (int) timeoutMs/1000;
+	timeout.tv_usec = (int)((timeoutMs / 1000 - (int)(timeoutMs / 1000)) *1e6);
+#endif
 	while( bytesReceived < length )
 	{
 		// set timeout
+#ifdef _WIN32
 		DWORD dwto = timeoutMs;
-		setsockopt(m_sockfd,SOL_SOCKET, SO_RCVTIMEO , (const char*)&dwto, sizeof(DWORD) );
+		setsockopt(m_sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&dwto, sizeof(DWORD));
+#else
+		if (setsockopt(m_sockfd, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout)))
+			throw SocketException("An error ocurred in setsockopt");
+#endif
 
 		// Perform read
-		int retVal = recv(m_sockfd, refData + bytesReceived, length - bytesReceived, 0 );
+		int retVal = recv(m_sockfd, refData + bytesReceived, length - bytesReceived, 0	 );
+		int tmp_errno = errno;
 		if( retVal <= 0 )
 		{
+#ifdef _WIN32
 			if( WSAGetLastError() == WSAETIMEDOUT ) throw SocketTimeout("Unable to read within timeout");
+#else
+			if (tmp_errno == ETIMEDOUT || tmp_errno == EWOULDBLOCK) throw SocketTimeout("Unable to read within timeout");
+#endif
 			else {
 				Close();
 				throw SocketException("An error ocurred while attempting to read data");
@@ -140,15 +171,21 @@ int TcpClient::Recv( char* refData, int length, int timeoutMs )
 
 void TcpClient::InitializeWindowsSocket()
 {
+#ifdef _WIN32
 	// Only initialize once
 	if( m_win32Initialized == true ) return;
 	m_win32Initialized = true;
 
+
 	// Initialize window32 socket
-	 WSADATA wsaData;
+	WSADATA wsaData;
 
     if (WSAStartup(MAKEWORD(2,0), &wsaData) != 0) {
         fprintf(stderr, "WSAStartup failed.\n");
 		throw Exception("Unable to initialize winsock2!");
     }
+#else
+	if (m_win32Initialized == true) return;
+	m_win32Initialized = true;
+#endif
 }

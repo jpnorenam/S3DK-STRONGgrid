@@ -20,7 +20,12 @@
 *
 */
 
+#ifdef _WIN32
 #include <WinSock2.h>
+#else
+#include <arpa/inet.h>
+#include <string.h>
+#endif
 #include "EncDec.h"
 
 using namespace strongridbase;
@@ -143,7 +148,7 @@ void EncDec::put_Double( char* data, double val, int* offset )
 void EncDec::put_String( char* data, std::string val, int maxLength, int* offset )
 {
 	memset(data+*offset, 0, maxLength);
-	int adjLen = __min(maxLength,val.length());
+	int adjLen = !(val.length() < maxLength) ? maxLength : val.length();
 	memcpy(data+*offset,val.c_str(),adjLen);
 	*offset += maxLength;
 }

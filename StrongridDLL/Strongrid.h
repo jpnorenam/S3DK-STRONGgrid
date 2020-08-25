@@ -28,14 +28,17 @@ typedef unsigned char      BOOL8_t;
 typedef signed char        int8_t;
 typedef short              int16_t;
 typedef int                int32_t;
-typedef long long          int64_t;
+//typedef long long          int64_t;
 typedef unsigned char      uint8_t;
 typedef unsigned short     uint16_t;
 typedef unsigned int       uint32_t;
-typedef unsigned long long uint64_t;
+//typedef unsigned long long uint64_t;
 
+#ifdef _WIN32
 #define STRONGRIDIEEEC37118DLL_API extern "C" __declspec(dllexport)
-
+#else
+#define STRONGRIDIEEEC37118DLL_API extern "C"
+#endif
 
 typedef struct
 {
@@ -279,21 +282,22 @@ typedef struct
 	BOOL8_t		isValidBit;  // Bit is valid
 }noArraysDigitalConfig;
 
-STRONGRIDIEEEC37118DLL_API int __cdecl connectPdc( char *ipAddress,  int port, int32_t pdcId,  int32_t* pseudoPdcId);
+#ifdef _WIN32
+STRONGRIDIEEEC37118DLL_API int __cdecl connectPdc(char* ipAddress, int port, int32_t pdcId, int32_t* pseudoPdcId);
 
-STRONGRIDIEEEC37118DLL_API int __cdecl disconnectPdc( int32_t pseudoPdcId);
+STRONGRIDIEEEC37118DLL_API int __cdecl disconnectPdc(int32_t pseudoPdcId);
 
-STRONGRIDIEEEC37118DLL_API int __cdecl readHeaderData( int32_t timeoutMs, int32_t pseudoPdcId);
+STRONGRIDIEEEC37118DLL_API int __cdecl readHeaderData(int32_t timeoutMs, int32_t pseudoPdcId);
 
-STRONGRIDIEEEC37118DLL_API int __cdecl readConfiguration( int32_t timeoutMs, int32_t pseudoPdcId);
+STRONGRIDIEEEC37118DLL_API int __cdecl readConfiguration(int32_t timeoutMs, int32_t pseudoPdcId);
 
-STRONGRIDIEEEC37118DLL_API int __cdecl readConfiguration_Ver3( int32_t timeoutMs, int32_t pseudoPdcId);
+STRONGRIDIEEEC37118DLL_API int __cdecl readConfiguration_Ver3(int32_t timeoutMs, int32_t pseudoPdcId);
 
-STRONGRIDIEEEC37118DLL_API int __cdecl startDataStream( int32_t pseudoPdcId);
+STRONGRIDIEEEC37118DLL_API int __cdecl startDataStream(int32_t pseudoPdcId);
 
-STRONGRIDIEEEC37118DLL_API int __cdecl stopDataStream( int32_t pseudoPdcId);
+STRONGRIDIEEEC37118DLL_API int __cdecl stopDataStream(int32_t pseudoPdcId);
 
-STRONGRIDIEEEC37118DLL_API int __cdecl readNextFrame( int32_t timeoutMs, int32_t pseudoPdcId);
+STRONGRIDIEEEC37118DLL_API int __cdecl readNextFrame(int32_t timeoutMs, int32_t pseudoPdcId);
 
 STRONGRIDIEEEC37118DLL_API int __cdecl dllshutdown();
 
@@ -301,7 +305,7 @@ STRONGRIDIEEEC37118DLL_API int __cdecl dllshutdown();
 //  pseudoPdcIdArrayLength = The length of the input array
 //  outPseudoPdcIdArr = the input array where the pseudo PDC id's are placed
 //  outNumPdcWithData = the total number of PDC's with data waiting
-STRONGRIDIEEEC37118DLL_API int __cdecl pollPdcWithDataWaiting( int pseudoPdcIdArrayLength, int32_t* outPseudoPdcIdArr, int32_t* outNumPdcWithData, int pollTimeoutMs );
+STRONGRIDIEEEC37118DLL_API int __cdecl pollPdcWithDataWaiting(int pseudoPdcIdArrayLength, int32_t* outPseudoPdcIdArr, int32_t* outNumPdcWithData, int pollTimeoutMs);
 
 STRONGRIDIEEEC37118DLL_API int __cdecl getPdcConfig(pdcConfiguration* pdcCfg, int32_t pseudoPdcId);
 
@@ -311,39 +315,107 @@ STRONGRIDIEEEC37118DLL_API int __cdecl getPmuConfiguration(pmuConfig* pmuconf, i
 
 STRONGRIDIEEEC37118DLL_API int __cdecl getPmuConfiguration_Ver3(pmuConfig_Ver3* pmuconf, int32_t pseudoPdcId, int32_t pmuIndex);
 
-STRONGRIDIEEEC37118DLL_API int __cdecl getPhasorConfig(phasorConfig *phasorCfg, int32_t pseudoPdcId, int32_t pmuIndex, int32_t phasorIndex);
+STRONGRIDIEEEC37118DLL_API int __cdecl getPhasorConfig(phasorConfig* phasorCfg, int32_t pseudoPdcId, int32_t pmuIndex, int32_t phasorIndex);
 
-STRONGRIDIEEEC37118DLL_API int __cdecl getPhasorConfig_Ver3(phasorConfig_Ver3 *phasorCfg, int32_t pseudoPdcId, int32_t pmuIndex, int32_t phasorIndex);
+STRONGRIDIEEEC37118DLL_API int __cdecl getPhasorConfig_Ver3(phasorConfig_Ver3* phasorCfg, int32_t pseudoPdcId, int32_t pmuIndex, int32_t phasorIndex);
 
-STRONGRIDIEEEC37118DLL_API int __cdecl getAnalogConfig(analogConfig *analogCfg, int32_t pseudoPdcId, int32_t pmuIndex, int32_t analogIndex);
+STRONGRIDIEEEC37118DLL_API int __cdecl getAnalogConfig(analogConfig* analogCfg, int32_t pseudoPdcId, int32_t pmuIndex, int32_t analogIndex);
 
-STRONGRIDIEEEC37118DLL_API int __cdecl getAnalogConfig_Ver3(analogConfig_Ver3 *analogCfg, int32_t pseudoPdcId, int32_t pmuIndex, int32_t analogIndex);
+STRONGRIDIEEEC37118DLL_API int __cdecl getAnalogConfig_Ver3(analogConfig_Ver3* analogCfg, int32_t pseudoPdcId, int32_t pmuIndex, int32_t analogIndex);
 
-STRONGRIDIEEEC37118DLL_API int __cdecl getDigitalConfig(digitalConfig* digitalCfg, int32_t pseudoPdcId, int32_t pmuIndex, int32_t digitalIndex );
+STRONGRIDIEEEC37118DLL_API int __cdecl getDigitalConfig(digitalConfig* digitalCfg, int32_t pseudoPdcId, int32_t pmuIndex, int32_t digitalIndex);
 
-STRONGRIDIEEEC37118DLL_API int __cdecl getDigitalConfig_Ver3(digitalConfig* digitalCfg, int32_t pseudoPdcId, int32_t pmuIndex, int32_t digitalIndex );
+STRONGRIDIEEEC37118DLL_API int __cdecl getDigitalConfig_Ver3(digitalConfig* digitalCfg, int32_t pseudoPdcId, int32_t pmuIndex, int32_t digitalIndex);
 
 STRONGRIDIEEEC37118DLL_API int __cdecl getPdcRealData(pdcDataFrame* rd, int32_t pseudoPdcId);
 
 STRONGRIDIEEEC37118DLL_API int __cdecl getPmuRealData(pmuDataFrame* rd, PmuStatus* status, int32_t pseudoPdcId, int32_t pmuIndex);
 
-STRONGRIDIEEEC37118DLL_API int __cdecl getHeaderMsg( char* msg, int maxMsgLength, int32_t pseudoPdcId);
+STRONGRIDIEEEC37118DLL_API int __cdecl getHeaderMsg(char* msg, int maxMsgLength, int32_t pseudoPdcId);
 
 // --------------------- LABVIEW COMPATABILITY FUNCTIONS: All char* arrays must be 256 bytes, or longer  --------------------------
 
 STRONGRIDIEEEC37118DLL_API int __cdecl getPmuRealDataLabview(noArraysPmuDataFrame* rd, PmuStatus* status,
+	uint16_t PhasorArrayLength, float* phasorValueReal, float* phasorValueImaginary,
+	uint16_t AnalogArrayLength, float* analogValueArr,
+	uint16_t DigitalArrayLength, uint8_t* digitalValueArr,
+	int32_t pseudoPdcId, int32_t pmuIndex);
+
+STRONGRIDIEEEC37118DLL_API int __cdecl getPmuConfigurationLabview(noArraysPmuConfig* pmuconf, char* stationName, int32_t pseudoPdcId, int32_t pmuIndex);
+
+STRONGRIDIEEEC37118DLL_API int __cdecl getPhasorConfigLabview(noArraysPhasorConfig* phasorCfg, char* name, int32_t pseudoPdcId, int32_t pmuIndex, int32_t phasorIndex);
+
+STRONGRIDIEEEC37118DLL_API int __cdecl getAnalogConfigLabview(noArraysAnalogConfig* analogCfg, char* name, int32_t pseudoPdcId, int32_t pmuIndex, int32_t analogIndex);
+
+STRONGRIDIEEEC37118DLL_API int __cdecl getDigitalConfigLabview(noArraysDigitalConfig* digitalCfg, char* name, int32_t pseudoPdcId, int32_t pmuIndex, int32_t digitalIndex);
+
+#else
+
+STRONGRIDIEEEC37118DLL_API int connectPdc( char *ipAddress,  int port, int32_t pdcId,  int32_t* pseudoPdcId);
+
+STRONGRIDIEEEC37118DLL_API int disconnectPdc( int32_t pseudoPdcId);
+
+STRONGRIDIEEEC37118DLL_API int readHeaderData( int32_t timeoutMs, int32_t pseudoPdcId);
+
+STRONGRIDIEEEC37118DLL_API int readConfiguration( int32_t timeoutMs, int32_t pseudoPdcId);
+
+STRONGRIDIEEEC37118DLL_API int readConfiguration_Ver3( int32_t timeoutMs, int32_t pseudoPdcId);
+
+STRONGRIDIEEEC37118DLL_API int startDataStream( int32_t pseudoPdcId);
+
+STRONGRIDIEEEC37118DLL_API int stopDataStream( int32_t pseudoPdcId);
+
+STRONGRIDIEEEC37118DLL_API int readNextFrame( int32_t timeoutMs, int32_t pseudoPdcId);
+
+STRONGRIDIEEEC37118DLL_API int dllshutdown();
+
+// Fills in "outPseudoPdcIdArr" with pseudoPdcId's which have data waiting.
+//  pseudoPdcIdArrayLength = The length of the input array
+//  outPseudoPdcIdArr = the input array where the pseudo PDC id's are placed
+//  outNumPdcWithData = the total number of PDC's with data waiting
+STRONGRIDIEEEC37118DLL_API int pollPdcWithDataWaiting( int pseudoPdcIdArrayLength, int32_t* outPseudoPdcIdArr, int32_t* outNumPdcWithData, int pollTimeoutMs );
+
+STRONGRIDIEEEC37118DLL_API int getPdcConfig(pdcConfiguration* pdcCfg, int32_t pseudoPdcId);
+
+STRONGRIDIEEEC37118DLL_API int getPdcConfig_Ver3(pdcConfiguration* pdcCfg, int32_t pseudoPdcId);
+
+STRONGRIDIEEEC37118DLL_API int getPmuConfiguration(pmuConfig* pmuconf, int32_t pseudoPdcId, int32_t pmuIndex);
+
+STRONGRIDIEEEC37118DLL_API int getPmuConfiguration_Ver3(pmuConfig_Ver3* pmuconf, int32_t pseudoPdcId, int32_t pmuIndex);
+
+STRONGRIDIEEEC37118DLL_API int getPhasorConfig(phasorConfig *phasorCfg, int32_t pseudoPdcId, int32_t pmuIndex, int32_t phasorIndex);
+
+STRONGRIDIEEEC37118DLL_API int getPhasorConfig_Ver3(phasorConfig_Ver3 *phasorCfg, int32_t pseudoPdcId, int32_t pmuIndex, int32_t phasorIndex);
+
+STRONGRIDIEEEC37118DLL_API int getAnalogConfig(analogConfig *analogCfg, int32_t pseudoPdcId, int32_t pmuIndex, int32_t analogIndex);
+
+STRONGRIDIEEEC37118DLL_API int getAnalogConfig_Ver3(analogConfig_Ver3 *analogCfg, int32_t pseudoPdcId, int32_t pmuIndex, int32_t analogIndex);
+
+STRONGRIDIEEEC37118DLL_API int getDigitalConfig(digitalConfig* digitalCfg, int32_t pseudoPdcId, int32_t pmuIndex, int32_t digitalIndex );
+
+STRONGRIDIEEEC37118DLL_API int getDigitalConfig_Ver3(digitalConfig* digitalCfg, int32_t pseudoPdcId, int32_t pmuIndex, int32_t digitalIndex );
+
+STRONGRIDIEEEC37118DLL_API int getPdcRealData(pdcDataFrame* rd, int32_t pseudoPdcId);
+
+STRONGRIDIEEEC37118DLL_API int getPmuRealData(pmuDataFrame* rd, PmuStatus* status, int32_t pseudoPdcId, int32_t pmuIndex);
+
+STRONGRIDIEEEC37118DLL_API int getHeaderMsg( char* msg, int maxMsgLength, int32_t pseudoPdcId);
+
+// --------------------- LABVIEW COMPATABILITY FUNCTIONS: All char* arrays must be 256 bytes, or longer  --------------------------
+
+STRONGRIDIEEEC37118DLL_API int getPmuRealDataLabview(noArraysPmuDataFrame* rd, PmuStatus* status,
 															uint16_t PhasorArrayLength, float* phasorValueReal, float* phasorValueImaginary,
 															uint16_t AnalogArrayLength, float* analogValueArr,
 															uint16_t DigitalArrayLength, uint8_t* digitalValueArr,
 															int32_t pseudoPdcId, int32_t pmuIndex);
 
-STRONGRIDIEEEC37118DLL_API int __cdecl getPmuConfigurationLabview(noArraysPmuConfig* pmuconf, char* stationName, int32_t pseudoPdcId, int32_t pmuIndex);
+STRONGRIDIEEEC37118DLL_API int getPmuConfigurationLabview(noArraysPmuConfig* pmuconf, char* stationName, int32_t pseudoPdcId, int32_t pmuIndex);
 
-STRONGRIDIEEEC37118DLL_API int __cdecl getPhasorConfigLabview(noArraysPhasorConfig *phasorCfg, char* name, int32_t pseudoPdcId, int32_t pmuIndex, int32_t phasorIndex);
+STRONGRIDIEEEC37118DLL_API int getPhasorConfigLabview(noArraysPhasorConfig *phasorCfg, char* name, int32_t pseudoPdcId, int32_t pmuIndex, int32_t phasorIndex);
 
-STRONGRIDIEEEC37118DLL_API int __cdecl getAnalogConfigLabview(noArraysAnalogConfig *analogCfg, char* name, int32_t pseudoPdcId, int32_t pmuIndex, int32_t analogIndex);
+STRONGRIDIEEEC37118DLL_API int getAnalogConfigLabview(noArraysAnalogConfig *analogCfg, char* name, int32_t pseudoPdcId, int32_t pmuIndex, int32_t analogIndex);
 
-STRONGRIDIEEEC37118DLL_API int __cdecl getDigitalConfigLabview(noArraysDigitalConfig* digitalCfg, char* name, int32_t pseudoPdcId, int32_t pmuIndex, int32_t digitalIndex );
-
+STRONGRIDIEEEC37118DLL_API int getDigitalConfigLabview(noArraysDigitalConfig* digitalCfg, char* name, int32_t pseudoPdcId, int32_t pmuIndex, int32_t digitalIndex );
+#endif
 
 #endif

@@ -20,8 +20,17 @@
 *
 */
 
-#include <winsock2.h>
-#include <Windows.h>
+#ifdef _WIN32
+#include <WinSock2.h>
+#include <ws2tcpip.h>
+#else
+#include <sys/socket.h>
+#include <netdb.h>
+#include <errno.h>
+#include <poll.h>
+#endif
+
+
 #include <math.h>
 #include <stdint.h>
 #include "Strongrid.h"
@@ -50,25 +59,26 @@ static int s_pdcClientCursor = 0;
 static PdcClient* s_pdcClientMap[MAXIMUM_CONCURRENT_CLIENTS]; // maps: index -> PdcClient* [0 => no client]
 static std::vector<std::pair<int,int>> s_socketPollVector; // Maps: pseudopdcid, socket FD | only contains active clients
 
-BOOL APIENTRY DllMain( HANDLE hModule,
-					  DWORD  msg,
-					  LPVOID lpReserved)
-{
-	switch (msg)
-	{
-	case DLL_PROCESS_ATTACH:
-		memset(s_pdcClientMap, 0, sizeof(PdcClient*) ); // set all to 0
-		break;
 
-	case DLL_THREAD_ATTACH: break;
-	case DLL_THREAD_DETACH: break;
-
-	case DLL_PROCESS_DETACH:
-
-		break;
-	}
-	return TRUE;
-}
+//BOOL APIENTRY DllMain( HANDLE hModule,
+//					  DWORD  msg,
+//					  LPVOID lpReserved)
+//{
+//	switch (msg)
+//	{
+//	case DLL_PROCESS_ATTACH:
+//		memset(s_pdcClientMap, 0, sizeof(PdcClient*) ); // set all to 0
+//		break;
+//
+//	case DLL_THREAD_ATTACH: break;
+//	case DLL_THREAD_DETACH: break;
+//
+//	case DLL_PROCESS_DETACH:
+//
+//		break;
+//	}
+//	return TRUE;
+//}
 
 
 STRONGRIDIEEEC37118DLL_API int init(void)
@@ -146,7 +156,8 @@ STRONGRIDIEEEC37118DLL_API int disconnectPdc(int32_t pseudoPdcId)
 	}
 }
 
-STRONGRIDIEEEC37118DLL_API int __cdecl readHeaderData( int32_t timeout, int32_t pseudoPdcId)
+//STRONGRIDIEEEC37118DLL_API int __cdecl readHeaderData( int32_t timeout, int32_t pseudoPdcId)
+STRONGRIDIEEEC37118DLL_API int readHeaderData(int32_t timeout, int32_t pseudoPdcId)
 {
 	if( PseudoPdcIdIsValidClient(pseudoPdcId) == false) return RETERR_UNKNOWN_ERR;
 
@@ -164,7 +175,8 @@ STRONGRIDIEEEC37118DLL_API int __cdecl readHeaderData( int32_t timeout, int32_t 
 	}
 }
 
-STRONGRIDIEEEC37118DLL_API int __cdecl readConfiguration(  int32_t timeout, int32_t pseudoPdcId)
+//STRONGRIDIEEEC37118DLL_API int __cdecl readConfiguration(int32_t timeout, int32_t pseudoPdcId)
+STRONGRIDIEEEC37118DLL_API int readConfiguration(  int32_t timeout, int32_t pseudoPdcId)
 {
 	if( PseudoPdcIdIsValidClient(pseudoPdcId) == false) return RETERR_UNKNOWN_ERR;
 
@@ -181,8 +193,8 @@ STRONGRIDIEEEC37118DLL_API int __cdecl readConfiguration(  int32_t timeout, int3
 		return RETERR_UNKNOWN_ERR;
 	}
 }
-
-STRONGRIDIEEEC37118DLL_API int __cdecl readConfiguration_Ver3(  int32_t timeout, int32_t pseudoPdcId)
+//STRONGRIDIEEEC37118DLL_API int __cdecl readConfiguration_Ver3(  int32_t timeout, int32_t pseudoPdcId)
+STRONGRIDIEEEC37118DLL_API int readConfiguration_Ver3(  int32_t timeout, int32_t pseudoPdcId)
 {
 	if( PseudoPdcIdIsValidClient(pseudoPdcId) == false) return RETERR_UNKNOWN_ERR;
 
@@ -246,7 +258,7 @@ STRONGRIDIEEEC37118DLL_API int readNextFrame(int32_t timeOut, int32_t pseudoPdcI
 	}
 }
 
-STRONGRIDIEEEC37118DLL_API int dllshutdown(void)
+STRONGRIDIEEEC37118DLL_API int dllshutdown()
 {
 	try {
 		// Traverse the entire clientmap and shutdown/delete every non-null entry
@@ -265,12 +277,16 @@ STRONGRIDIEEEC37118DLL_API int dllshutdown(void)
 	return RETERR_OK;
 }
 
-std::vector<int> CheckPortsForDataToRead(int  timeoutMs)
+std::vector<int> CheckPortsForDataToRead(int timeoutMs)
 {
 	// Copy the data into a temporary array to avoid blocking too long
 	MutexFragment mux(&s_clientMapLock);
 	const int arrayLength = s_socketPollVector.size();
+#ifdef _WIN32
 	WSAPOLLFD* socketListenArray = new WSAPOLLFD[arrayLength];
+#else
+	pollfd* socketListenArray = new pollfd[arrayLength];
+#endif
 	int* pseudoPdcIdArr = new int[arrayLength];
 
 	for( int i = 0; i < arrayLength; ++i ) {
@@ -279,16 +295,20 @@ std::vector<int> CheckPortsForDataToRead(int  timeoutMs)
 		pseudoPdcIdArr[i] = s_socketPollVector[i].first;
 	}
 	mux.Finalize();
-
 	// Poll for data
+#ifdef _WIN32
 	int ret = WSAPoll(socketListenArray, arrayLength, timeoutMs);
+#else
+	int ret = poll(socketListenArray, arrayLength, timeoutMs);
+#endif
 
 	std::vector<int> output;
 	if( ret > 0 )
 	{
 		for( int i = 0; i < arrayLength; ++i )
 		{
-			if( socketListenArray[i].revents & (POLLRDNORM | POLLERR | POLLHUP)  ) output.push_back(pseudoPdcIdArr[i]);
+			if( socketListenArray[i].revents & (POLLRDNORM | POLLERR | POLLHUP)  ) 
+				output.push_back(pseudoPdcIdArr[i]);
 		}
 	}
 
@@ -298,7 +318,8 @@ std::vector<int> CheckPortsForDataToRead(int  timeoutMs)
 	return output;
 }
 
-STRONGRIDIEEEC37118DLL_API int __cdecl pollPdcWithDataWaiting( int pseudoPdcIdArrayLength, int32_t* outPseudoPdcIdArr, int32_t* outNumPdcWithData, int pollTimeoutMs )
+//STRONGRIDIEEEC37118DLL_API int __cdecl pollPdcWithDataWaiting( int pseudoPdcIdArrayLength, int32_t* outPseudoPdcIdArr, int32_t* outNumPdcWithData, int pollTimeoutMs )
+STRONGRIDIEEEC37118DLL_API int pollPdcWithDataWaiting(int pseudoPdcIdArrayLength, int32_t* outPseudoPdcIdArr, int32_t* outNumPdcWithData, int pollTimeoutMs)
 {
 	try {
 		// Get a list of all sockets available for reading
@@ -307,7 +328,7 @@ STRONGRIDIEEEC37118DLL_API int __cdecl pollPdcWithDataWaiting( int pseudoPdcIdAr
 		// Copy data from result to output arrray
 		for( int i = 0; i < readsockVec.size() && i < pseudoPdcIdArrayLength; ++i )
 			outPseudoPdcIdArr[i] = readsockVec[i];
-		*outNumPdcWithData = min(readsockVec.size(),pseudoPdcIdArrayLength);
+		*outNumPdcWithData = !(readsockVec.size() < pseudoPdcIdArrayLength) ? pseudoPdcIdArrayLength : readsockVec.size();
 		return RETERR_OK;
 	}
 	catch( Exception e )
@@ -397,7 +418,7 @@ STRONGRIDIEEEC37118DLL_API int getPmuConfiguration(pmuConfig* pmuconf, int32_t p
 
 		pmuconf->pmuid = pmuCfg.IdCode;
 		memset(pmuconf->stationname, 0, 256);
-		strncpy(pmuconf->stationname, pmuCfg.StationName.c_str(), min(pmuCfg.StationName.length(), 255) );
+		strncpy(pmuconf->stationname, pmuCfg.StationName.c_str(), !(pmuCfg.StationName.length() < 255) ? 255 : pmuCfg.StationName.length() );
 		pmuconf->nominalFrequency = pmuCfg.NomFreqCode.GetAsFrequency();
 		pmuconf->numberOfPhasors = pmuCfg.phasorChnNames.size();
 		pmuconf->numberOfAnalog = pmuCfg.analogChnNames.size();
@@ -421,7 +442,7 @@ STRONGRIDIEEEC37118DLL_API int getPmuConfiguration_Ver3(pmuConfig_Ver3* pmuconf,
 
 		pmuconf->pmuid = pmuCfg.IdCode;
 		memset(pmuconf->stationname, 0, 256);
-		strncpy(pmuconf->stationname, pmuCfg.StationName.c_str(), min(pmuCfg.StationName.length(), 255) );
+		strncpy(pmuconf->stationname, pmuCfg.StationName.c_str(),!(pmuCfg.StationName.length() < 255) ? 255 : pmuCfg.StationName.length());
 		pmuconf->nominalFrequency = pmuCfg.NomFreqCode.GetAsFrequency();
 		pmuconf->numberOfPhasors = pmuCfg.phasorChnNames.size();
 		pmuconf->numberOfAnalog = pmuCfg.analogChnNames.size();
@@ -456,7 +477,7 @@ STRONGRIDIEEEC37118DLL_API int getPhasorConfig( phasorConfig* phasorCfg, int32_t
 		const C37118PhasorUnit& phUnit = pmuCfg.PhasorUnit[phasorIndex];
 
 		memset( phasorCfg->name, 0, 256 );
-		strncpy(phasorCfg->name, pmuCfg.phasorChnNames[phasorIndex].c_str(), min(pmuCfg.phasorChnNames[phasorIndex].length(), 255) );
+		strncpy(phasorCfg->name, pmuCfg.phasorChnNames[phasorIndex].c_str(), !(pmuCfg.phasorChnNames[phasorIndex].length() < 255) ? 255 : pmuCfg.phasorChnNames[phasorIndex].length());
 		phasorCfg->type = phUnit.Type;
 		phasorCfg->format = 0;
 		phasorCfg->dataIsScaled = pmuCfg.DataFormat.Bit1_0xPhasorsIsInt_1xPhasorFloat == 1; // if "float" => data is scaled
@@ -480,7 +501,7 @@ STRONGRIDIEEEC37118DLL_API int getPhasorConfig_Ver3( phasorConfig_Ver3* phasorCf
 		const C37118PhasorScale_Ver3& phUnit = pmuCfg.PhasorScales[phasorIndex];
 
 		memset( phasorCfg->name, 0, 256 );
-		strncpy(phasorCfg->name, pmuCfg.phasorChnNames[phasorIndex].c_str(), min(pmuCfg.phasorChnNames[phasorIndex].length(), 255) );
+		strncpy(phasorCfg->name, pmuCfg.phasorChnNames[phasorIndex].c_str(), !(pmuCfg.phasorChnNames[phasorIndex].length() < 255) ? 255 : pmuCfg.phasorChnNames[phasorIndex].length());
 		phasorCfg->type = phUnit.VoltOrCurrent;
 		phasorCfg->format = 0;
 		phasorCfg->dataIsScaled = pmuCfg.DataFormat.Bit1_0xPhasorsIsInt_1xPhasorFloat == 1; // if "float" => data is scaled
@@ -505,7 +526,7 @@ STRONGRIDIEEEC37118DLL_API int getAnalogConfig( analogConfig *analogCfg, int32_t
 		const C37118AnalogUnit& angUnit = pmuCfg.AnalogUnit[analogIndex];
 
 		memset(analogCfg->name, 0, 256);
-		strncpy(analogCfg->name, pmuCfg.analogChnNames[analogIndex].c_str(), min(pmuCfg.analogChnNames[analogIndex].length(), 255) );
+		strncpy(analogCfg->name, pmuCfg.analogChnNames[analogIndex].c_str(), !(pmuCfg.analogChnNames[analogIndex].length() < 255) ? 255 : pmuCfg.analogChnNames[analogIndex].length());
 		analogCfg->Type = angUnit.Type_X;
 		analogCfg->dataIsScaled = false;
 		analogCfg->userdefined_scalar = angUnit.AnalogScalar;
@@ -528,7 +549,7 @@ STRONGRIDIEEEC37118DLL_API int getAnalogConfig_Ver3( analogConfig_Ver3 *analogCf
 		const C37118AnalogScale_Ver3& angScale = pmuCfg.AnalogScales[analogIndex];
 
 		memset(analogCfg->name, 0, 256);
-		strncpy(analogCfg->name, pmuCfg.analogChnNames[analogIndex].c_str(), min(pmuCfg.analogChnNames[analogIndex].length(), 255) );
+		strncpy(analogCfg->name, pmuCfg.analogChnNames[analogIndex].c_str(), !(pmuCfg.analogChnNames[analogIndex].length() < 255) ? 255 : pmuCfg.analogChnNames[analogIndex].length());
 		analogCfg->dataIsScaled = false;
 		analogCfg->scaling_magnitude = angScale.Scale;
 		analogCfg->scaling_offset = angScale.Offset;
@@ -553,7 +574,7 @@ STRONGRIDIEEEC37118DLL_API int getDigitalConfig(  digitalConfig* digitalCfg, int
 		const C37118DigitalUnit& digUnit = pmuCfg.DigitalUnit[unitWordIdx];
 
 		memset(digitalCfg->name, 0, 256);
-		strncpy(digitalCfg->name, pmuCfg.digitalChnNames[digitalIndex].c_str(), min(pmuCfg.digitalChnNames[digitalIndex].length(), 255) );
+		strncpy(digitalCfg->name, pmuCfg.digitalChnNames[digitalIndex].c_str(), !(pmuCfg.digitalChnNames[digitalIndex].length() < 255) ? 255 : pmuCfg.digitalChnNames[digitalIndex].length());
 
 		bool normBit, validBit;
 		digUnit.BitAtIdx(digitalIndex % 16, &normBit, &validBit);
@@ -579,7 +600,7 @@ STRONGRIDIEEEC37118DLL_API int getDigitalConfig_Ver3(  digitalConfig* digitalCfg
 		const C37118DigitalUnit& digUnit = pmuCfg.DigitalUnits[unitWordIdx];
 
 		memset(digitalCfg->name, 0, 256);
-		strncpy(digitalCfg->name, pmuCfg.digitalChnNames[digitalIndex].c_str(), min(pmuCfg.digitalChnNames[digitalIndex].length(), 255) );
+		strncpy(digitalCfg->name, pmuCfg.digitalChnNames[digitalIndex].c_str(), !(pmuCfg.digitalChnNames[digitalIndex].length() < 255) ? 255 : pmuCfg.digitalChnNames[digitalIndex].length());
 
 		bool normBit, validBit;
 		digUnit.BitAtIdx(digitalIndex % 16, &normBit, &validBit);
@@ -673,7 +694,8 @@ STRONGRIDIEEEC37118DLL_API int getHeaderMsg( char* msg, int maxMsgLength, int32_
 		const C37118PdcHeaderFrame& hdr = s_pdcClientMap[pseudoPdcId]->GetPdcHeaderFrame();
 
 		memset(msg, 0, maxMsgLength);
-		strncpy(msg, hdr.HeaderMessage.c_str(), min(maxMsgLength, hdr.HeaderMessage.length()));	msg[maxMsgLength - 1] = 0;
+		strncpy(msg, hdr.HeaderMessage.c_str(), !(maxMsgLength < hdr.HeaderMessage.length()) ? hdr.HeaderMessage.length() : maxMsgLength);	
+		msg[maxMsgLength - 1] = 0;
 		return RETERR_OK;
 	}
 	catch( ... )
@@ -686,11 +708,16 @@ STRONGRIDIEEEC37118DLL_API int getHeaderMsg( char* msg, int maxMsgLength, int32_
 // ------------- LABVIEW SPECIFIC FUNCTIONS / NO ARRAYS WITHIN STRUCTURES
 // ------------------------------------------------------------------------------------------------------------------------------------
 
-STRONGRIDIEEEC37118DLL_API int __cdecl getPmuRealDataLabview(noArraysPmuDataFrame* rd, PmuStatus* rdsts,
-															uint16_t PhasorArrayLength, float* phasorValueReal, float* phasorValueImaginary,
-															uint16_t AnalogArrayLength, float* analogValueArr,
-															uint16_t DigitalArrayLength, uint8_t* digitalValueArr,
-															int32_t pseudoPdcId, int32_t pmuIndex)
+//STRONGRIDIEEEC37118DLL_API int __cdecl getPmuRealDataLabview(noArraysPmuDataFrame* rd, PmuStatus* rdsts,
+//															uint16_t PhasorArrayLength, float* phasorValueReal, float* phasorValueImaginary,
+//															uint16_t AnalogArrayLength, float* analogValueArr,
+//															uint16_t DigitalArrayLength, uint8_t* digitalValueArr,
+//															int32_t pseudoPdcId, int32_t pmuIndex)
+STRONGRIDIEEEC37118DLL_API int getPmuRealDataLabview(noArraysPmuDataFrame* rd, PmuStatus* rdsts,
+													uint16_t PhasorArrayLength, float* phasorValueReal, float* phasorValueImaginary,
+													uint16_t AnalogArrayLength, float* analogValueArr,
+													uint16_t DigitalArrayLength, uint8_t* digitalValueArr,
+													int32_t pseudoPdcId, int32_t pmuIndex)
 {
 	if( PseudoPdcIdIsValidClient(pseudoPdcId) == false) return RETERR_UNKNOWN_ERR;
 
@@ -742,7 +769,8 @@ STRONGRIDIEEEC37118DLL_API int __cdecl getPmuRealDataLabview(noArraysPmuDataFram
 	}
 }
 
-STRONGRIDIEEEC37118DLL_API int __cdecl getPmuConfigurationLabview(noArraysPmuConfig* pmuconf, char* stationName, int32_t pseudoPdcId, int32_t pmuIndex)
+//STRONGRIDIEEEC37118DLL_API int __cdecl getPmuConfigurationLabview(noArraysPmuConfig* pmuconf, char* stationName, int32_t pseudoPdcId, int32_t pmuIndex)
+STRONGRIDIEEEC37118DLL_API int getPmuConfigurationLabview(noArraysPmuConfig* pmuconf, char* stationName, int32_t pseudoPdcId, int32_t pmuIndex)
 {
 	pmuConfig tmpConfig; tmpConfig.stationname = stationName;
 	int retval = getPmuConfiguration(&tmpConfig, pseudoPdcId, pmuIndex);
@@ -756,7 +784,8 @@ STRONGRIDIEEEC37118DLL_API int __cdecl getPmuConfigurationLabview(noArraysPmuCon
 	return retval;
 }
 
-STRONGRIDIEEEC37118DLL_API int __cdecl getPhasorConfigLabview(noArraysPhasorConfig *phasorCfg, char* name, int32_t pseudoPdcId, int32_t pmuIndex, int32_t phasorIndex)
+//STRONGRIDIEEEC37118DLL_API int __cdecl getPhasorConfigLabview(noArraysPhasorConfig *phasorCfg, char* name, int32_t pseudoPdcId, int32_t pmuIndex, int32_t phasorIndex)
+STRONGRIDIEEEC37118DLL_API int getPhasorConfigLabview(noArraysPhasorConfig* phasorCfg, char* name, int32_t pseudoPdcId, int32_t pmuIndex, int32_t phasorIndex)
 {
 	phasorConfig tmpCfg; tmpCfg.name = name;
 	int retval = getPhasorConfig(&tmpCfg, pseudoPdcId, pmuIndex, phasorIndex);
@@ -769,7 +798,8 @@ STRONGRIDIEEEC37118DLL_API int __cdecl getPhasorConfigLabview(noArraysPhasorConf
 	return retval;
 }
 
-STRONGRIDIEEEC37118DLL_API int __cdecl getAnalogConfigLabview(noArraysAnalogConfig *analogCfg, char* name, int32_t pseudoPdcId, int32_t pmuIndex, int32_t analogIndex)
+//STRONGRIDIEEEC37118DLL_API int __cdecl getAnalogConfigLabview(noArraysAnalogConfig *analogCfg, char* name, int32_t pseudoPdcId, int32_t pmuIndex, int32_t analogIndex)
+STRONGRIDIEEEC37118DLL_API int getAnalogConfigLabview(noArraysAnalogConfig* analogCfg, char* name, int32_t pseudoPdcId, int32_t pmuIndex, int32_t analogIndex)
 {
 	analogConfig tmpCfg; tmpCfg.name = name;
 	int retval = getAnalogConfig(&tmpCfg, pseudoPdcId, pmuIndex, analogIndex);
@@ -781,7 +811,8 @@ STRONGRIDIEEEC37118DLL_API int __cdecl getAnalogConfigLabview(noArraysAnalogConf
 	return retval;
 }
 
-STRONGRIDIEEEC37118DLL_API int __cdecl getDigitalConfigLabview(noArraysDigitalConfig* digitalCfg, char* name, int32_t pseudoPdcId, int32_t pmuIndex, int32_t digitalIndex )
+//STRONGRIDIEEEC37118DLL_API int __cdecl getDigitalConfigLabview(noArraysDigitalConfig* digitalCfg, char* name, int32_t pseudoPdcId, int32_t pmuIndex, int32_t digitalIndex )
+STRONGRIDIEEEC37118DLL_API int getDigitalConfigLabview(noArraysDigitalConfig* digitalCfg, char* name, int32_t pseudoPdcId, int32_t pmuIndex, int32_t digitalIndex )
 {
 	digitalConfig tmpCfg; tmpCfg.name = name;
 	int retval = getDigitalConfig(&tmpCfg, pseudoPdcId, pmuIndex, digitalIndex);

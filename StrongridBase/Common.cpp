@@ -20,7 +20,9 @@
 *
 */
 
+#ifdef _WIN32
 #include <Windows.h>
+#endif
 #include "common.h"
 #include <time.h>
 
@@ -29,7 +31,11 @@ using namespace strongridbase;
 tm TimeConversionHelper::SecondsSinceEpochToDateTime(uint64_t SecondsSinceEpoch)
 {
 	tm blah;
+#ifdef _WIN32
 	gmtime_s(&blah, (time_t*)&SecondsSinceEpoch);
+#else 
+	gmtime_r((time_t*)&SecondsSinceEpoch, &blah);
+#endif
 	return blah;
 }
 

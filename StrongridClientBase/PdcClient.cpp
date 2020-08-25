@@ -19,13 +19,15 @@
 *  along with StrongridDLL.  If not, see <http://www.gnu.org/licenses/>.
 *
 */
-
-#include <process.h>
-#include <iostream>
+#ifdef _WIN32
 #include <Windows.h>
+#include <process.h>
+#endif
+
+#include <iostream>
 #include "PdcClient.h"
 #include "../StrongridBase/common.h"
-#include "../StrongridBase/C37118Protocol.h";
+#include "../StrongridBase/C37118Protocol.h"
 
 using namespace strongridclientbase;
 using namespace strongridbase;

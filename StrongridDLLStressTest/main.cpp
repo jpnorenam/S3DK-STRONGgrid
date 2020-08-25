@@ -20,12 +20,19 @@
 *
 */
 
+#ifdef _WIN32
 #include <windows.h>
 #include <process.h>
+#include <conio.h>
+#else
+#include <string.h>
+#include <pthread.h>
+#include <ctime>
+#include <unistd.h>
+#endif
 #include <iostream>
 #include <sstream>
 #include <iomanip>
-#include <conio.h>
 #include <ctype.h>
 #include <vector>
 #include "../StrongridDLL/Strongrid.h"
@@ -149,15 +156,23 @@ private:
 
 std::string getLogTs()
 {
-	_SYSTEMTIME sysTime;
 	ostringstream ostr;
+#ifdef _WIN32
+	_SYSTEMTIME sysTime;
 	GetLocalTime(&sysTime);
 	ostr << sysTime.wYear << "." << sysTime.wMonth << "." << sysTime.wDay << " "
-			<< setfill('0') << setw(2) << sysTime.wHour  << ":"
-			<< setfill('0') << setw(2) << sysTime.wMinute << ":"
-			<< setfill('0') << setw(2) << sysTime.wSecond << "\t";
-
-	return ostr.str();
+		<< setfill('0') << setw(2) << sysTime.wHour << ":"
+		<< setfill('0') << setw(2) << sysTime.wMinute << ":"
+		<< setfill('0') << setw(2) << sysTime.wSecond << "\t";
+#else
+	std::time_t t = std::time(0);   // get time now
+	std::tm* sysTime = std::localtime(&t);
+	ostr << sysTime->tm_year << "." << sysTime->tm_mon  << "." << sysTime->tm_mday<< " "
+		 << setfill('0') << setw(2) << sysTime->tm_hour << ":"
+		 << setfill('0') << setw(2) << sysTime->tm_min  << ":"
+		 << setfill('0') << setw(2) << sysTime->tm_sec  << "\t";
+#endif
+	return ostr.str(); 
 }
 
 void ReadFrameLoopProc(int pseudoPdcId, ostream& strout, const std::vector<PmuState*>& pmuConfigurationMap  )
@@ -251,13 +266,17 @@ void ReadFrameLoopProc(int pseudoPdcId, ostream& strout, const std::vector<PmuSt
 	}
 }
 
-void pdcThreadProc_Ver3(void* pdccfgraw)
+void *pdcThreadProc_Ver3(void* pdccfgraw)
 {
 	PdcConfig pdc = *((PdcConfig*)pdccfgraw);
 
 	while( SHUTDOWN_FLAG == false )
 	{
+#ifdef _WIN32
 		Sleep(2000);
+#else
+		sleep(2);
+#endif
 		int pseudoPdcId = -1;
 
 		ostringstream ostr;
@@ -274,7 +293,11 @@ void pdcThreadProc_Ver3(void* pdccfgraw)
 				isConnected = retval == 0;
 				if( isConnected == false ) {
 		 			strout << getLogTs() << "StrongridIEEEC37118Dll::connectPdc returned " << retval << ". Waiting 10s.";
+#ifdef _WIN32
 					Sleep(10000);
+#else
+					sleep(10);
+#endif
 				}
 			}
 			strout << getLogTs() << "Connection established" << endl;
@@ -283,18 +306,29 @@ void pdcThreadProc_Ver3(void* pdccfgraw)
 			if( WRITE_OUTPUT_TO_FILE )
 			{
 				// Get timestamp
+#ifdef _WIN32
 				_SYSTEMTIME sysTime;
 				GetLocalTime(&sysTime);
-
 				ostr.clear(); ostr << "PDC_" << pdc.PdcId << "!" << pseudoPdcId << "_"
 					<< sysTime.wYear << "." << sysTime.wMonth << "." << sysTime.wDay << "_"
-					<< setfill('0') << setw(2) << sysTime.wHour  << "_"
+					<< setfill('0') << setw(2) << sysTime.wHour << "_"
 					<< setfill('0') << setw(2) << sysTime.wMinute << "_"
-					<< setfill('0') << setw(2) << sysTime.wSecond <<  ".log";
+					<< setfill('0') << setw(2) << sysTime.wSecond << ".log";
+#else
+				std::time_t t = std::time(0);   // get time now
+				std::tm* sysTime = std::localtime(&t);
+				ostr.clear(); ostr << "PDC_" << pdc.PdcId << "!" << pseudoPdcId << "_"
+					<< sysTime->tm_year << "." << sysTime->tm_mon << "." << sysTime->tm_mday<< "_"
+					<< setfill('0') << setw(2) << sysTime->tm_hour << "_"
+					<< setfill('0') << setw(2) << sysTime->tm_min << "_"
+					<< setfill('0') << setw(2) << sysTime->tm_sec << ".log";
+#endif
+
 				ostr.width(2);
 				strout << getLogTs() << "Switching to file based output: '" << ostr.str() << "' for PDCID=" << pdc.PdcId << " @ " << pdc.IP << ":" << pdc.Port << std::endl;
-				objFileBuf.open (ostr.str(), ios :: out);
-				strout.set_rdbuf(&objFileBuf);
+				objFileBuf.open (ostr.str(), ios :: out);	
+				//strout.set_rdbuf(&objFileBuf);
+				strout.rdbuf(&objFileBuf);
 			}
 
 			// Assert on the pseudopdcid - must be >= 0
@@ -421,21 +455,27 @@ void pdcThreadProc_Ver3(void* pdccfgraw)
 		}
 	}
 	// cleanup
+#ifdef _WIN32
 	_endthread();
+#endif
 }
 
-void pdcThreadProc(void* pdccfgraw)
+void *pdcThreadProc(void* pdccfgraw)
 {
 	PdcConfig pdc = *((PdcConfig*)pdccfgraw);
 
 	while( SHUTDOWN_FLAG == false )
 	{
+#ifdef _WIN32
 		Sleep(2000);
+#else
+		sleep(2);
+#endif
 		int pseudoPdcId = -1;
 
 		ostringstream ostr;
+		filebuf objFileBuf;
 		ostream strout(cout.rdbuf());
-		filebuf   objFileBuf;
 
 		try {
 			// Connect to the pdc
@@ -447,7 +487,11 @@ void pdcThreadProc(void* pdccfgraw)
 				isConnected = retval == 0;
 				if( isConnected == false ) {
 		 			strout << getLogTs() << "StrongridIEEEC37118Dll::connectPdc returned " << retval << ". Waiting 10s.";
+#ifdef _WIN32
 					Sleep(10000);
+#else
+					sleep(10);
+#endif
 				}
 			}
 			strout << getLogTs() << "Connection established" << endl;
@@ -455,21 +499,29 @@ void pdcThreadProc(void* pdccfgraw)
 			// change output buffer to 'file' if
 			if( WRITE_OUTPUT_TO_FILE )
 			{
-				// Get timestamp
+#ifdef _WIN32
 				_SYSTEMTIME sysTime;
 				GetLocalTime(&sysTime);
-
 				ostr.clear(); ostr << "PDC_" << pdc.PdcId << "!" << pseudoPdcId << "_"
 					<< sysTime.wYear << "." << sysTime.wMonth << "." << sysTime.wDay << "_"
-					<< setfill('0') << setw(2) << sysTime.wHour  << "_"
+					<< setfill('0') << setw(2) << sysTime.wHour << "_"
 					<< setfill('0') << setw(2) << sysTime.wMinute << "_"
-					<< setfill('0') << setw(2) << sysTime.wSecond <<  ".log";
+					<< setfill('0') << setw(2) << sysTime.wSecond << ".log";
+#else
+				std::time_t t = std::time(0);   // get time now
+				std::tm* sysTime = std::localtime(&t);
+				ostr.clear(); ostr << "PDC_" << pdc.PdcId << "!" << pseudoPdcId << "_"
+					<< sysTime->tm_year << "." << sysTime->tm_mon << "." << sysTime->tm_mday << "_"
+					<< setfill('0') << setw(2) << sysTime->tm_hour << "_"
+					<< setfill('0') << setw(2) << sysTime->tm_min << "_"
+					<< setfill('0') << setw(2) << sysTime->tm_sec << ".log";
+#endif
 				ostr.width(2);
 				strout << getLogTs() << "Switching to file based output: '" << ostr.str() << "' for PDCID=" << pdc.PdcId << " @ " << pdc.IP << ":" << pdc.Port << std::endl;
-				objFileBuf.open (ostr.str(), ios :: out);
-				strout.set_rdbuf(&objFileBuf);
+				objFileBuf.open (ostr.str(), ios::out);
+				strout.rdbuf(&objFileBuf);
+				//strout.ios::set_rdbuf(&objFileBuf);
 			}
-
 			// Assert on the pseudopdcid - must be >= 0
 			if( pseudoPdcId < 0 ) throw Exception("PseudoPdcId < 0");
 
@@ -591,15 +643,17 @@ void pdcThreadProc(void* pdccfgraw)
 	}
 
 	// cleanup
+#ifdef _WIN32
 	_endthread();
+#endif
 }
 
 int main(int argc, char *argv[])
 {
-		string IP   =   "130.237.53.177";
-		int Port    =   10000;
-		string PdcId =  "1000";
-		int Version =   1;
+	string IP   =   "192.168.33.11";
+	int Port    =   37118;
+	string PdcId =  "1000";
+	int Version =   1;
 
 	try {
 		PdcConfig config(IP, Port, PdcId, Version);
@@ -613,20 +667,35 @@ int main(int argc, char *argv[])
 		cout << endl << endl << "Spawning PDC worker thread:\n";
 		cout << endl << endl << "Connect to PDC:\n";
 
-		if (config.Version == 1 )
+#ifdef _WIN32
+		if (config.Version == 1)
 			_beginthread(pdcThreadProc, 0, (void*)&config);
 		else if (config.Version == 2)
 			_beginthread(pdcThreadProc_Ver3, 0, (void*)&config);
 		else
 			throw Exception("Invalid config - Version must be either 1 or 2");
+#else
+		pthread_t pdcThread;
+		if (config.Version == 1)
+			pthread_create(&pdcThread, NULL, pdcThreadProc, (void*)&config);
+		else if (config.Version == 2)
+			pthread_create(&pdcThread, NULL, pdcThreadProc_Ver3, (void*)&config);
+		else
+			throw Exception("Invalid config - Version must be either 1 or 2");
+#endif
+
 
 
 		// Close program
 		while( cin.get() != 'q');
 		cout << "\nShutting down..";
 		SHUTDOWN_FLAG = true; // signal shutdown to PDC worker threads
-
+#ifdef _WIN32
 		Sleep(2000);
+#else
+		pthread_join(pdcThread, NULL);
+		sleep(2);
+#endif
 	}
 	catch( Exception e )
 	{

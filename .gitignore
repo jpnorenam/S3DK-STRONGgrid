@@ -1,0 +1,30 @@
+/build*/
+*~
+*.swp
+.clang_complete
+.project
+.cproject
+.settings/
+.vscode/
+
+*.egg-info/
+
+python/dist/
+
+# YouCompleteMe
+.ycm_extra_conf.py
+
+*.pyc
+
+# Visual studio
+.vs/
+/out*/
+CMakeSettings.json
+
+# Vagrant
+.vagrant/
+*.pub
+
+# Dependencies
+dependencies/
+iPDC/

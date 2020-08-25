@@ -26,24 +26,43 @@ using namespace stronggriddll;
 
 Mutex::Mutex()
 {
+#ifdef  _WIN32
 	m_hMutex = CreateMutex(
-        NULL,              // default security attributes
-        FALSE,             // initially not owned
-        NULL);             // unnamed mutex
+		NULL,              // default security attributes
+		FALSE,             // initially not owned
+		NULL);             // unnamed mutex
+#else
+	pthread_mutex_init(&m_hMutex, NULL);
+#endif
 }
 
 Mutex::~Mutex()
 {
+#ifdef  _WIN32
 	CloseHandle(m_hMutex);
+#else
+	pthread_mutex_destroy(&m_hMutex);
+#endif
 }
 
 bool Mutex::Enter( int timeoutMs )
 {
+#ifdef  _WIN32
 	int result = WaitForSingleObject( m_hMutex, timeoutMs );
 	return result == WAIT_OBJECT_0;
+#else
+	struct timespec timeout;
+	timeout.tv_nsec = timeoutMs * 1000000;
+	int result = pthread_mutex_timedlock(&m_hMutex, &timeout);
+	return result == 0;
+#endif
 }
 
 void Mutex::Exit()
 {
+#ifdef  _WIN32
 	ReleaseMutex(m_hMutex);
+#else
+	pthread_mutex_unlock(&m_hMutex);
+#endif
 }

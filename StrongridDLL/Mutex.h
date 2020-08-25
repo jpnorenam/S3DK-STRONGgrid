@@ -21,8 +21,13 @@
 */
 
 #pragma once
-
+#ifdef _WIN32
 #include <Windows.h>
+#else
+#include <pthread.h>
+#include <math.h>
+#endif 
+
 
 namespace stronggriddll
 {
@@ -36,13 +41,17 @@ namespace stronggriddll
 		void Exit();
 
 	private:
+#ifdef _WIN32
 		HANDLE m_hMutex;
+#else
+		pthread_mutex_t m_hMutex;
+#endif
 	};
 
 	class MutexFragment
 	{
 	public:
-		MutexFragment( Mutex* mutex, int timeout = INFINITE )
+		MutexFragment( Mutex* mutex, int timeout = (int)INFINITY )
 		{
 			m_mutex = mutex;
 			m_mutex->Enter(timeout);
